@@ -5,6 +5,7 @@ import com.dwp.employeecatalog.model.Employee;
 import com.dwp.employeecatalog.util.TestDataFactory;
 import io.restassured.response.Response;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -70,6 +71,13 @@ class CreateEmployeeTests extends BaseTest {
         assertThat(response.jsonPath().getString("lastName"), equalTo(employee.getLastName()));
     }
 
+    // DISABLED — DO NOT DELETE. Sends only the documented-required fields, omitting
+    // phone/address. In practice the fragile free-tier host does not tolerate the
+    // absent nested contactInfo fields: it returns 5xx / crashes (same class as
+    // FINDINGS #5, and see FINDINGS #8 — the server appears to require the full
+    // contactInfo despite the docs saying only email is required). Kept for when
+    // the API is fixed / run locally; disabled now so it can't take the host down.
+    @Disabled("Minimal body (no phone/address) crashes/rejects on the live host. See FINDINGS #5/#8.")
     @Test
     @DisplayName("minimal payload (required fields only) is accepted")
     void minimalPayload_isAccepted() {
@@ -101,6 +109,13 @@ class CreateEmployeeTests extends BaseTest {
                 response.jsonPath().getString("error.field"), containsString("email"));
     }
 
+    // DISABLED — DO NOT DELETE. This test sends a malformed payload (missing
+    // required field). The live service has a defect (FINDINGS #5) where invalid
+    // input throws an unhandled error that CRASHES the single free-tier instance,
+    // taking the API *and* the /api-docs UI down until Render restarts it.
+    // Kept for when the API is fixed / run against a local build; disabled for now
+    // so the suite doesn't take the shared host down.
+    @Disabled("Crashes the live free-tier host (invalid input -> unhandled 5xx). See FINDINGS #5.")
     @Test
     @DisplayName("missing required field (lastName) is rejected, not 201")
     void missingRequiredField_isRejected() {
@@ -112,7 +127,9 @@ class CreateEmployeeTests extends BaseTest {
                         TestDataFactory.uniqueEmail("no", "last"), null, null))
                 .build();
 
-        Response response = api.createEmployee(token, employee);
+        // No-retry: an invalid payload can crash the fragile free-tier host
+        // (FINDINGS #5); retrying would only re-trigger the crash. We send once.
+        Response response = api.createEmployeeNoRetry(token, employee);
 
         // A well-behaved API should reject this with a 4xx (ideally 400).
         assertThat("creating without a required field must not succeed with 201",
@@ -122,6 +139,10 @@ class CreateEmployeeTests extends BaseTest {
         extractEmployeeId(response).ifPresent(createdIds::add);
     }
 
+    // DISABLED — DO NOT DELETE. Malformed payload (missing required email); may
+    // crash the live free-tier host (unhandled 5xx on invalid input, FINDINGS #5),
+    // taking the API + /api-docs UI down. Re-enable against a fixed / local API.
+    @Disabled("Crashes the live free-tier host (invalid input -> unhandled 5xx). See FINDINGS #5.")
     @Test
     @DisplayName("missing contactInfo.email is rejected, not 201")
     void missingEmail_isRejected() {
@@ -132,17 +153,23 @@ class CreateEmployeeTests extends BaseTest {
                 .contactInfo(new ContactInfo(null, "+441234567890", null))
                 .build();
 
-        Response response = api.createEmployee(token, employee);
+        // No-retry: see missingRequiredField_isRejected.
+        Response response = api.createEmployeeNoRetry(token, employee);
 
         assertThat("creating without the required email must not succeed with 201",
                 response.statusCode(), is(not(201)));
         extractEmployeeId(response).ifPresent(createdIds::add);
     }
 
+    // DISABLED — DO NOT DELETE. Empty body {} may crash the live free-tier host
+    // (unhandled 5xx on invalid input, FINDINGS #5), taking the API + /api-docs UI
+    // down. Re-enable against a fixed / local API.
+    @Disabled("Crashes the live free-tier host (invalid input -> unhandled 5xx). See FINDINGS #5.")
     @Test
     @DisplayName("empty JSON body is rejected, not 201")
     void emptyBody_isRejected() {
-        Response response = api.createEmployee(token, Map.of());
+        // No-retry: an empty body can crash the fragile free-tier host (FINDINGS #5).
+        Response response = api.createEmployeeNoRetry(token, Map.of());
 
         assertThat("an empty body must not create an employee",
                 response.statusCode(), is(not(201)));

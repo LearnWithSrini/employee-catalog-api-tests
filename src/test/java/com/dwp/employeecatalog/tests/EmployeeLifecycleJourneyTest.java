@@ -84,9 +84,14 @@ class EmployeeLifecycleJourneyTest extends BaseTest {
     @Order(5)
     @DisplayName("Step 5 - amend the employee's details (change of circumstances)")
     void step5_amendEmployee() {
+        // Complete valid body (reuse the new hire's required dateOfBirth/contact,
+        // change only the first name). A partial body would omit required fields
+        // and trigger the server's crash-on-invalid-input defect (FINDINGS #5).
         Employee amendment = Employee.builder()
                 .firstName("Amended")
                 .lastName(newHire.getLastName())
+                .dateOfBirth(newHire.getDateOfBirth())
+                .contactInfo(newHire.getContactInfo())
                 .build();
 
         Response update = api.updateEmployee(token, employeeId, amendment);

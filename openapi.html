@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Employee Catalog Management API — OpenAPI</title>
+  <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5.17.14/swagger-ui.css">
+  <style>
+    body { margin: 0; background: #fafafa; }
+    .topbar { display: none; }
+    #legend {
+      font-family: sans-serif; font-size: 13px; color: #3b4151;
+      max-width: 1460px; margin: 12px auto 0; padding: 10px 20px;
+      background: #fff; border: 1px solid #e8e8e8; border-radius: 4px;
+    }
+    #legend b { color: #c00; }
+  </style>
+</head>
+<body>
+  <div id="legend">
+    <b>*</b> = required field (shown by Swagger UI with a red asterisk in every request model).
+    Everything else is optional. Expand any request body's <em>Schema</em> to see the required/optional breakdown.
+  </div>
+  <div id="swagger-ui"></div>
+  <script src="https://unpkg.com/swagger-ui-dist@5.17.14/swagger-ui-bundle.js"></script>
+  <script>
+    const spec = {
+      openapi: "3.0.3",
+      info: {
+        title: "Employee Catalog Management API",
+        version: "1.0.0",
+        description:
+          "HR-admin API for managing employee records. Only authenticated HR admins may read or modify the catalog.\n\n" +
+          "**Auth flow:** `POST /hr/login` returns a JWT, which every `/employees` call must carry as `Authorization: Bearer <token>`.\n\n" +
+          "Required fields are marked with a red asterisk (*) in the request schemas below.\n\n" +
+          "_Derived from the DWP back-end test exercise. Documented quirks are noted per-operation._"
+      },
+      servers: [
+        { url: "https://apisforemployeecatalogmanagementsystem.onrender.com", description: "Live service (free-tier, cold-starts)" }
+      ],
+      tags: [
+        { name: "Authentication", description: "HR admin login" },
+        { name: "Employees", description: "Employee catalog CRUD (all require a bearer token)" }
+      ],
+      components: {
+        securitySchemes: {
+          bearerAuth: { type: "http", scheme: "bearer", bearerFormat: "JWT" }
+        },
+        schemas: {
+          LoginRequest: {
+            type: "object",
+            required: ["username", "password"],
+            properties: {
+              username: { type: "string", example: "admin1", description: "REQUIRED. One of admin1…admin10." },
+              password: { type: "string", format: "password", example: "securePassword", description: "REQUIRED." }
+            }
+          },
+          LoginSuccess: {
+            type: "object",
+            properties: {
+              token: { type: "string", description: "Short-lived JWT bearer token.", example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." },
+              accountExpirationDate: { type: "string", format: "date-time", description: "Undocumented in the original spec but returned in practice (Finding #4)." }
+            }
+          },
+          Address: {
+            type: "object",
+            description: "Postal address. All fields optional.",
+            properties: {
+              street: { type: "string", example: "123 Main St" },
+              town: { type: "string", example: "Manchester" },
+              postCode: { type: "string", example: "M12 3T2" }
+            }
+          },
+          ContactInfo: {
+            type: "object",
+            required: ["email"],
+            description: "Contact block. Only email is required.",
+            properties: {
+              email: { type: "string", format: "email", example: "peter.pan@example.com", description: "REQUIRED. Must be unique across the catalog." },
+              phone: { type: "string", example: "+4434567890", description: "Optional." },
+              address: { $ref: "#/components/schemas/Address" }
+            }
+          },
+          EmployeeRequest: {
+            type: "object",
+            required: ["firstName", "lastName", "dateOfBirth", "contactInfo"],
+            description: "Create/amend payload. Required: firstName, lastName, dateOfBirth, contactInfo (which itself requires email).",
+            properties: {
+              firstName: { type: "string", example: "Peter", description: "REQUIRED." },
+              lastName: { type: "string", example: "Pan", description: "REQUIRED." },
+              dateOfBirth: { type: "string", format: "date", example: "2010-01-13", description: "REQUIRED. NOTE: server truncates to the year on create/list (Finding #1)." },
+              contactInfo: { $ref: "#/components/schemas/ContactInfo" }
+            }
+          },
+          Employee: {
+            type: "object",
+            description: "Employee as returned by the API. `id` is server-generated.",
+            properties: {
+              id: { type: "string", example: "Emp-ce2f233c-1a2b-3c4d-5e6f-7a8b9c0d1e2f", description: "Server-generated. Do not send on create." },
+              firstName: { type: "string", example: "Peter" },
+              lastName: { type: "string", example: "Pan" },
+              dateOfBirth: { type: "string", example: "2010", description: "Representation varies by endpoint (Finding #1/#2)." },
+              contactInfo: { $ref: "#/components/schemas/ContactInfo" }
+            }
+          },
+          Error: {
+            type: "object",
+            properties: {
+              message: { type: "string", example: "Invalid credentials", description: "Spec'd error field. NOTE: login actually returns `error` instead (Finding #3)." }
+            }
+          }
+        }
+      },
+      security: [{ bearerAuth: [] }],
+      paths: {
+        "/hr/login": {
+          post: {
+            tags: ["Authentication"],
+            summary: "Authenticate an HR admin and receive a JWT",
+            security: [],
+            requestBody: {
+              required: true,
+              content: { "application/json": { schema: { $ref: "#/components/schemas/LoginRequest" } } }
+            },
+            responses: {
+              "200": { description: "Authenticated. Returns a JWT.", content: { "application/json": { schema: { $ref: "#/components/schemas/LoginSuccess" } } } },
+              "401": { description: "Invalid credentials. (Body uses `error`, not `message` — Finding #3.)", content: { "application/json": { schema: { $ref: "#/components/schemas/Error" } } } }
+            }
+          }
+        },
+        "/employees": {
+          get: {
+            tags: ["Employees"],
+            summary: "List all employees",
+            responses: {
+              "200": { description: "Array of employees.", content: { "application/json": { schema: { type: "array", items: { $ref: "#/components/schemas/Employee" } } } } },
+              "401": { description: "Missing/invalid bearer token." }
+            }
+          },
+          post: {
+            tags: ["Employees"],
+            summary: "Add a new employee",
+            requestBody: {
+              required: true,
+              content: { "application/json": { schema: { $ref: "#/components/schemas/EmployeeRequest" } } }
+            },
+            responses: {
+              "201": { description: "Created. Returns the employee with a generated id.", content: { "application/json": { schema: { $ref: "#/components/schemas/Employee" } } } },
+              "400": { description: "Validation error — missing required field or duplicate email. (May intermittently surface as 5xx — Finding #5.)", content: { "application/json": { schema: { $ref: "#/components/schemas/Error" } } } },
+              "401": { description: "Missing/invalid bearer token." }
+            }
+          }
+        },
+        "/employees/{id}": {
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "string" }, example: "Emp-ce2f233c-1a2b-3c4d-5e6f-7a8b9c0d1e2f", description: "REQUIRED path parameter." }
+          ],
+          get: {
+            tags: ["Employees"],
+            summary: "Get one employee by id",
+            responses: {
+              "200": { description: "The matching employee.", content: { "application/json": { schema: { $ref: "#/components/schemas/Employee" } } } },
+              "401": { description: "Missing/invalid bearer token." },
+              "404": { description: "No employee with that id." }
+            }
+          },
+          put: {
+            tags: ["Employees"],
+            summary: "Amend an existing employee",
+            requestBody: {
+              required: true,
+              content: { "application/json": { schema: { $ref: "#/components/schemas/EmployeeRequest" } } }
+            },
+            responses: {
+              "200": { description: "Updated employee.", content: { "application/json": { schema: { $ref: "#/components/schemas/Employee" } } } },
+              "401": { description: "Missing/invalid bearer token." },
+              "404": { description: "No employee with that id." }
+            }
+          },
+          delete: {
+            tags: ["Employees"],
+            summary: "Remove an employee",
+            responses: {
+              "200": { description: "Deleted." },
+              "401": { description: "Missing/invalid bearer token." },
+              "404": { description: "No employee with that id." }
+            }
+          }
+        }
+      }
+    };
+
+    window.ui = SwaggerUIBundle({
+      spec: spec,
+      dom_id: "#swagger-ui",
+      deepLinking: true,
+      defaultModelsExpandDepth: 2,
+      defaultModelExpandDepth: 3,
+      docExpansion: "list",
+      tryItOutEnabled: true,
+      presets: [SwaggerUIBundle.presets.apis]
+    });
+  </script>
+</body>
+</html>

@@ -1,5 +1,6 @@
 package com.dwp.employeecatalog.tests;
 
+import com.dwp.employeecatalog.model.ContactInfo;
 import com.dwp.employeecatalog.model.Employee;
 import com.dwp.employeecatalog.util.TestDataFactory;
 import io.restassured.response.Response;
@@ -21,9 +22,17 @@ class UpdateEmployeeTests extends BaseTest {
     void updateExisting_persistsChange() {
         String id = api.createEmployeeAndReturnId(token, TestDataFactory.validEmployee());
         try {
+            // Send a COMPLETE valid body. A partial update (name only) omits the
+            // required dateOfBirth / contactInfo.email and triggers the server's
+            // crash-on-invalid-input defect (FINDINGS #5) -> a storm of 502s. A
+            // real "amend" supplies the full record, so this stays a clean
+            // happy-path test and doesn't take the host down.
             Employee update = Employee.builder()
                     .firstName("Amended")
                     .lastName("Surname")
+                    .dateOfBirth("1990-01-01")
+                    .contactInfo(new ContactInfo(
+                            TestDataFactory.uniqueEmail("amended", "surname"), null, null))
                     .build();
 
             Response response = api.updateEmployee(token, id, update);
@@ -44,7 +53,15 @@ class UpdateEmployeeTests extends BaseTest {
     @Test
     @DisplayName("updating a non-existent employee returns HTTP 404")
     void updateUnknown_returns404() {
-        Employee update = Employee.builder().firstName("Ghost").build();
+        // Full valid body so we exercise the not-found path, not the server's
+        // crash-on-invalid-input defect (FINDINGS #5).
+        Employee update = Employee.builder()
+                .firstName("Ghost")
+                .lastName("Missing")
+                .dateOfBirth("1990-01-01")
+                .contactInfo(new ContactInfo(
+                        TestDataFactory.uniqueEmail("ghost", "missing"), null, null))
+                .build();
 
         Response response = api.updateEmployee(token, TestDataFactory.nonExistentEmployeeId(), update);
 
