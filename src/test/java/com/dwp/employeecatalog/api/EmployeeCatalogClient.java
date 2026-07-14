@@ -195,6 +195,10 @@ public class EmployeeCatalogClient {
         return execute(() -> authedRequest(token).pathParam("id", id).get(Endpoints.EMPLOYEE_BY_ID));
     }
 
+    public Response getEmployeeByIdNoAuth(String id) {
+        return execute(() -> request().pathParam("id", id).get(Endpoints.EMPLOYEE_BY_ID));
+    }
+
     public Response updateEmployee(String token, String id, Object body) {
         return execute(() -> authedRequest(token).pathParam("id", id).body(body).put(Endpoints.EMPLOYEE_BY_ID));
     }

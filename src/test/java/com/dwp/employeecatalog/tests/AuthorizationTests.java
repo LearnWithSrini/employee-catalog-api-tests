@@ -52,6 +52,13 @@ class AuthorizationTests extends BaseTest {
     }
 
     @Test
+    @DisplayName("GET /employees/{id} without a token is rejected (401)")
+    void getById_withoutToken_isUnauthorized() {
+        Response response = api.getEmployeeByIdNoAuth(TestDataFactory.nonExistentEmployeeId());
+        assertThat(response.statusCode(), is(401));
+    }
+
+    @Test
     @DisplayName("POST /employees without a token is rejected (401)")
     void create_withoutToken_isUnauthorized() {
         Response response = api.createEmployeeNoAuth(TestDataFactory.validEmployee());
