@@ -8,6 +8,7 @@ import org.junit.jupiter.api.Test;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.emptyOrNullString;
+import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.not;
 
@@ -89,11 +90,11 @@ class LoginTests extends BaseTest {
     }
 
     @Test
-    @DisplayName("null username is rejected (no token)")
+    @DisplayName("null username is rejected (401, 'Invalid credentials', no token)")
     void nullUsername_isRejected() {
         Response response = api.login(null, ConfigManager.adminPassword());
 
-        assertRejected(response);
+        assertRejectedWith401(response);
     }
 
     // ---------------------------------------------------------------------
@@ -157,9 +158,16 @@ class LoginTests extends BaseTest {
                 response.jsonPath().getString("token"), is(emptyOrNullString()));
     }
 
-    /** As {@link #assertRejected} but also asserts the documented 401 status. */
+    /**
+     * As {@link #assertRejected} but also asserts the documented 401 status and
+     * the error message. NOTE: the message is returned under the {@code error}
+     * field, not {@code message} as the API docs state (see FINDINGS #3), so we
+     * read {@code error} to match the live contract.
+     */
     private static void assertRejectedWith401(Response response) {
         assertThat("invalid credentials should return 401", response.statusCode(), is(401));
+        assertThat("401 body should carry the 'Invalid credentials' message",
+                response.jsonPath().getString("error"), equalTo("Invalid credentials"));
         assertThat("no token may be leaked on a failed login",
                 response.jsonPath().getString("token"), is(emptyOrNullString()));
     }
