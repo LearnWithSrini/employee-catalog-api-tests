@@ -153,9 +153,9 @@ wiring needed — and lives outside `target/`, so `mvn clean` doesn't wipe it. E
 2026-07-14 15:52:49 | duration=   3.5s | total= 2  passed= 2  failed= 0  skipped= 0 | RESULT=PASS
 ```
 
-The `skipped` count includes `@Disabled` tests and any aborted on a host outage,
-so it's a handy record of how the suite behaved against the flaky free-tier host
-over its last few runs. The file is git-ignored (it's a local artifact).
+The `skipped` count reflects any tests aborted on a host outage (and `@Disabled`
+tests, if any), so it's a handy record of how the suite behaved against the flaky
+free-tier host over its last few runs. The file is git-ignored (it's a local artifact).
 
 ---
 
@@ -189,15 +189,17 @@ mvn test -Dretry.max.seconds=90                      # be more patient with the 
 employee-catalog-api-tests/
 ├── pom.xml
 ├── README.md
-├── FINDINGS.md
+├── Employee-Catalog-API-Service-Requirements.md   → what the API should do (from the docs)
+├── COVERAGE.md                                     → status-code → test matrix
+├── FINDINGS.md                                     → observed defects / gaps
 ├── .gitignore
 └── src/test/
     ├── java/com/dwp/employeecatalog/
     │   ├── api/      → REST-assured plumbing (how we talk to the API)
     │   ├── model/    → POJOs (the request/response data shapes)
-    │   ├── util/     → configuration + fake-data helpers
+    │   ├── util/     → config, fake-data helpers, run-history listener
     │   └── tests/    → the actual tests
-    └── resources/    → config + logging properties
+    └── resources/    → config + logging properties (+ META-INF/services listener registration)
 ```
 
 Everything is under `src/test` on purpose: this is a **test project**, not an
@@ -208,7 +210,7 @@ are test support code.
 
 | File | What it does |
 |------|--------------|
-| [`pom.xml`](pom.xml) | Maven build. Declares Java 21, the dependencies (REST-assured, JUnit 5, Hamcrest, Jackson, Datafaker, SLF4J) and the Surefire plugin that runs the JUnit 5 suite during `mvn test`. |
+| [`pom.xml`](pom.xml) | Maven build. Declares Java 21, the dependencies (REST-assured, JUnit 5, JUnit Platform Launcher, Hamcrest, Jackson, Datafaker, SLF4J) and the Surefire plugin that runs the JUnit 5 suite during `mvn test`. |
 | [`src/test/resources/config.properties`](src/test/resources/config.properties) | The single source of runtime configuration — base URL, credentials, retry tuning. See [§4](#4-configuration). |
 | [`src/test/resources/junit-platform.properties`](src/test/resources/junit-platform.properties) | JUnit 5 platform settings: readable `@DisplayName` generation and deterministic (sequential) execution, since all classes share one remote server. |
 | [`src/test/resources/simplelogger.properties`](src/test/resources/simplelogger.properties) | SLF4J-simple logging format so the console output during a run stays concise and timestamped. |
@@ -220,7 +222,7 @@ responses. They mirror the API's schema exactly.
 
 | File | What it represents |
 |------|--------------------|
-| [`model/Employee.java`](src/test/java/com/dwp/employeecatalog/model/Employee.java) | An employee (id, first/last name, date of birth, contact info). Includes a small fluent **`builder()`** so tests can construct employees readably. `dateOfBirth` is kept as a raw `String` on purpose — the API is inconsistent about its format (see [Findings](#9-findings--implementation-gaps)), so we don't bind it to a strict date type. |
+| [`model/Employee.java`](src/test/java/com/dwp/employeecatalog/model/Employee.java) | An employee (id, first/last name, date of birth, contact info). Includes a small fluent **`builder()`** so tests can construct employees readably. `dateOfBirth` is kept as a raw `String` on purpose — the API returns it in a non-standard form (just the year, e.g. `"1991"` — see [Findings](#9-findings--implementation-gaps)), so we don't bind it to a strict date type. |
 | [`model/ContactInfo.java`](src/test/java/com/dwp/employeecatalog/model/ContactInfo.java) | Nested contact block: `email` (required), `phone`, `address`. |
 | [`model/Address.java`](src/test/java/com/dwp/employeecatalog/model/Address.java) | Nested postal address: `street`, `town`, `postCode`. |
 | [`model/LoginRequest.java`](src/test/java/com/dwp/employeecatalog/model/LoginRequest.java) | The `{username, password}` body for `POST /hr/login`. |
@@ -241,15 +243,16 @@ extra/undocumented response fields never break deserialisation).
 | File | What it does |
 |------|--------------|
 | [`util/ConfigManager.java`](src/test/java/com/dwp/employeecatalog/util/ConfigManager.java) | Loads `config.properties` from the classpath and exposes typed accessors (`baseUri()`, `adminUsername()`, …). Crucially, a matching **JVM system property overrides** the file value, enabling the `-Dkey=value` overrides in [§4](#4-configuration). |
-| [`util/TestDataFactory.java`](src/test/java/com/dwp/employeecatalog/util/TestDataFactory.java) | Produces **fake, synthetic** employees via Datafaker so no real personal data is used. Emails are salted with a random token to guarantee uniqueness (the API rejects duplicate emails). Also provides `minimalValidEmployee()` and `nonExistentEmployeeId()` for edge-case tests. See [§8](#8-test-data-strategy). |
+| [`util/TestDataFactory.java`](src/test/java/com/dwp/employeecatalog/util/TestDataFactory.java) | Produces **fake, synthetic** employees via Datafaker so no real personal data is used. Emails are salted with a random token to guarantee uniqueness (the API rejects duplicate emails). Also provides `minimalValidEmployee()`, `blankContactInfo(email)` and `nonExistentEmployeeId()` for edge-case tests. See [§8](#8-test-data-strategy). |
+| [`util/TestRunHistoryListener.java`](src/test/java/com/dwp/employeecatalog/util/TestRunHistoryListener.java) | JUnit Platform listener that appends a timestamped one-line summary of each run to `test-history/test-results.log`, keeping the last 10. Auto-registered via `META-INF/services`; runs on every `mvn test`. See [§3](#3-quick-start). |
 
 ### `tests/` — the tests
 
 | File | Endpoint / concern | Highlights |
 |------|--------------------|-----------|
 | [`tests/BaseTest.java`](src/test/java/com/dwp/employeecatalog/tests/BaseTest.java) | Shared setup | Configures generous HTTP timeouts for the cold start and authenticates **once** (`@BeforeAll`), caching the bearer token for all subclasses. |
-| [`tests/LoginTests.java`](src/test/java/com/dwp/employeecatalog/tests/LoginTests.java) | `POST /hr/login` | Valid login returns a JWT; wrong password, unknown user, empty and wrong-case credentials are all rejected with `401` and leak no token. |
-| [`tests/AuthorizationTests.java`](src/test/java/com/dwp/employeecatalog/tests/AuthorizationTests.java) | Cross-cutting auth | Proves **every** employee endpoint rejects missing tokens with `401`, and that a garbage token is rejected. |
+| [`tests/LoginTests.java`](src/test/java/com/dwp/employeecatalog/tests/LoginTests.java) | `POST /hr/login` | Valid login returns a JWT; wrong / unknown / empty / blank / null username & password are rejected (`401`, no token, "Invalid credentials"). Also pins the `null`-password `500` defect. |
+| [`tests/AuthorizationTests.java`](src/test/java/com/dwp/employeecatalog/tests/AuthorizationTests.java) | Cross-cutting auth | Tests **every** employee endpoint from both sides: rejected without a token (`401`) / with a garbage token (`401/403`), and **authorised** with a valid admin token (`200/201`). |
 | [`tests/CreateEmployeeTests.java`](src/test/java/com/dwp/employeecatalog/tests/CreateEmployeeTests.java) | `POST /employees` | Happy path (`201` + generated id), minimal payload, duplicate-email (`400`), duplicate first name (allowed), empty/missing required fields. Cleans up created records in `@AfterEach`. |
 | [`tests/GetAllEmployeesTests.java`](src/test/java/com/dwp/employeecatalog/tests/GetAllEmployeesTests.java) | `GET /employees` | Returns `200` + a JSON array, every item has an id, and a freshly created employee appears in the list. |
 | [`tests/GetEmployeeByIdTests.java`](src/test/java/com/dwp/employeecatalog/tests/GetEmployeeByIdTests.java) | `GET /employees/{id}` | An existing id returns the matching record; an unknown id returns `404`. |
@@ -261,16 +264,18 @@ extra/undocumented response fields never break deserialisation).
 
 ## 6. Test coverage
 
-**32 tests** in total, all with explicit assertions:
+**43 tests** in total, all with explicit assertions:
 
-- **Authentication (`LoginTests`)** — 5 tests: token issuance and four rejection paths.
-- **Authorization (`AuthorizationTests`)** — 5 tests: every endpoint requires a valid bearer token.
-- **Create (`CreateEmployeeTests`)** — 6 tests: happy path + validation/negative cases.
+- **Authentication (`LoginTests`)** — 9 tests: token issuance plus rejection of wrong / unknown / empty / blank / null username & password (including the null-password `500` defect).
+- **Authorization (`AuthorizationTests`)** — 11 tests: every employee endpoint tested from **both** sides — rejected without / with an invalid token, and **authorised** with a valid admin token.
+- **Create (`CreateEmployeeTests`)** — 7 tests: happy path, minimal payload, duplicate email (`400`), duplicate first name (allowed), and empty / missing required fields.
 - **Read all (`GetAllEmployeesTests`)** — 3 tests.
 - **Read by id (`GetEmployeeByIdTests`)** — 2 tests.
 - **Update (`UpdateEmployeeTests`)** — 2 tests.
 - **Delete (`DeleteEmployeeTests`)** — 2 tests.
 - **End-to-end journey (`EmployeeLifecycleJourneyTest`)** — 7 ordered steps.
+
+The full status-code → test mapping is in **[COVERAGE.md](COVERAGE.md)**.
 
 Per the exercise guidelines, **no non-functional tests** (performance/security)
 are included.
@@ -300,7 +305,7 @@ A naive suite would be hopelessly flaky against this. The client distinguishes
 The initial login (`warmUpAndLogin`) has its own, larger budget
 (`warmup.max.seconds`) to absorb the cold start.
 
-**What this means when you run it:** on a warm host, all 32 tests pass. During a
+**What this means when you run it:** on a warm host, all 43 tests pass. During a
 bad patch on the free host, some tests may show as *skipped* (with a clear
 "service unreachable" message) rather than failing — re-running when the host is
 warm turns them green. This is deliberate: **skips = environment, failures = the API**.
@@ -322,16 +327,19 @@ warm turns them green. This is deliberate: **skips = environment, failures = the
 
 ## 9. Findings / implementation gaps
 
-The exercise asks the tester to identify gaps in the implementation. These are
-documented in **[FINDINGS.md](FINDINGS.md)**. Headlines:
+The exercise asks the tester to identify gaps in the implementation. All are
+documented in **[FINDINGS.md](FINDINGS.md)** (each mapped to the requirement it
+breaks in **[Employee-Catalog-API-Service-Requirements.md](Employee-Catalog-API-Service-Requirements.md)**). Headlines:
 
-- **`dateOfBirth` is truncated to the year** on create/list (day and month are lost).
-- **Inconsistent `dateOfBirth` format** across endpoints (year vs full ISO date-time).
+- **`dateOfBirth` is truncated to the year** on every endpoint (day and month are lost).
+- **Malformed input crashes the service** — an empty body / absent nested
+  `contactInfo` keys return `5xx` and can take the host down, instead of a clean `400`.
+- **Weak `firstName` validation** — a whitespace-only name is accepted (`201`).
+- **Missing `dateOfBirth` is accepted** and stored as `"NaN"`.
+- **Missing required fields return `500`** (not `400`); a `null` login password also `500`s.
 - **Login error contract mismatch** — the service returns `{"error": ...}` where
-  the docs specify `{"message": ...}`.
+  the docs specify `{"message": ...}`; and auth errors are **plain text**, not JSON.
 - **Undocumented `accountExpirationDate`** field in the login success response.
-- **Unstable validation path** — invalid create payloads sometimes return `5xx`
-  instead of a clean `400`.
 
 The tests are written to stay stable despite these (e.g. they don't assert an
 exact stored `dateOfBirth`), while the observations are captured for the developers.

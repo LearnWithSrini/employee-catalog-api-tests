@@ -19,14 +19,4 @@ the development team. Severity is a rough judgement of business impact.
 | 13 | Medium | `POST /employees` | **Missing required field returns `500`, not `400`.** With the optional nested contact fields present (so #8 isn't triggered), omitting a required top-level field returns a handled but wrong status: `500` `{"message":"An error occurred","error":"User validation failed: lastName: Path \`lastName\` is required."}` (same for `contactInfo.email`). The validation is detected and reported, but surfaced as a server error instead of a client `400 Bad Request`. |
 | 10 | Medium | `POST /hr/login` | **`null` password returns `500` instead of `401`.** A login with a valid username and a JSON `null` password returns **`500`** `{"error":"An error occurred during login"}` — an unhandled error rather than a clean authentication failure. (An empty-string `""`, a blank `" "`, a `null` username, an empty-string username and a wrong password are all correctly rejected with `401`; only the `null` **password** mishandles the input.) No token is issued, so it isn't a security hole, but invalid input should yield a deterministic `401`/`400`, never a `500`. Same unhandled-input theme as #5. |
 
-## How the tests relate to these findings
 
-- The suite asserts on **status codes and behaviour** (e.g. duplicate email → 400,
-  auth required → 401, delete then 404), which is stable regardless of the
-  `dateOfBirth` quirk.
-- Because finding #1/#2 make `dateOfBirth` unreliable, the tests deliberately do
-  **not** assert an exact stored `dateOfBirth` value; the `Employee` model keeps
-  it as a raw `String` and the observation is documented here instead. This keeps
-  the suite green while still surfacing the defect for the developers.
-- Findings #2, #3 and #4 are documentation/contract issues; they are recorded
-  here as the "gaps in the implementation" the exercise asks the tester to identify.
