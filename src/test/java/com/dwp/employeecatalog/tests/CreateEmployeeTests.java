@@ -21,6 +21,7 @@ import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.not;
+import static org.hamcrest.Matchers.oneOf;
 import static org.hamcrest.Matchers.emptyOrNullString;
 import static org.hamcrest.Matchers.startsWith;
 
@@ -146,11 +147,12 @@ class CreateEmployeeTests extends BaseTest {
 
         Response response = api.createEmployee(token, employee);
 
-        // Must not be created. NOTE: the live API returns 500 with a validation
-        // message ("...lastName ... is required") rather than the correct 400 —
-        // a handled-but-wrong status (see FINDINGS #5).
-        assertThat("creating without a required field must not succeed with 201",
-                response.statusCode(), is(not(201)));
+        // Must be rejected as a validation error. The API *currently* returns 500,
+        // but the correct status is 400 (FINDINGS #13) — oneOf(400, 500) accepts
+        // both so the test survives a future fix, while still failing if the
+        // endpoint regresses to some other status (e.g. 201/401/404).
+        assertThat("missing lastName must be rejected as a validation error",
+                response.statusCode(), is(oneOf(400, 500)));
         assertThat("error should name the missing required field (lastName)",
                 response.jsonPath().getString("error"),
                 allOf(containsString("lastName"), containsString("required")));
@@ -172,8 +174,9 @@ class CreateEmployeeTests extends BaseTest {
 
         Response response = api.createEmployee(token, employee);
 
-        assertThat("creating without the required email must not succeed with 201",
-                response.statusCode(), is(not(201)));
+        // Currently 500, correct is 400 (FINDINGS #13) — accept either.
+        assertThat("missing email must be rejected as a validation error",
+                response.statusCode(), is(oneOf(400, 500)));
         assertThat("error should name the missing required field (email)",
                 response.jsonPath().getString("error"),
                 allOf(containsString("email"), containsString("required")));
