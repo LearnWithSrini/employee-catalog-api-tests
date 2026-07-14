@@ -15,6 +15,7 @@ import java.util.Map;
 import java.util.Optional;
 
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.allOf;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
@@ -107,15 +108,26 @@ class CreateEmployeeTests extends BaseTest {
         createdIds.add(created.jsonPath().getString("employeeId"));
 
         // Second employee re-using the same email address.
+        String dupEmail = first.getContactInfo().getEmail();
         Employee duplicate = TestDataFactory.validEmployee();
-        duplicate.getContactInfo().setEmail(first.getContactInfo().getEmail());
+        duplicate.getContactInfo().setEmail(dupEmail);
 
         Response response = api.createEmployee(token, duplicate);
 
         assertThat("re-using an email must be rejected", response.statusCode(), is(400));
-        // The API reports the duplicated field as "contactInfo.email".
+
+        // Top-level error message.
+        assertThat("body should report a duplicate-key error",
+                response.jsonPath().getString("message"), equalTo("Duplicate key error"));
+
+        // Nested error detail: the offending field, its value, and a human message.
         assertThat("error should identify the offending field as the email",
                 response.jsonPath().getString("error.field"), containsString("email"));
+        assertThat("error should echo the duplicated email value",
+                response.jsonPath().getString("error.value"), equalTo(dupEmail));
+        assertThat("error message should say the email is already in use",
+                response.jsonPath().getString("error.message"),
+                allOf(containsString(dupEmail), containsString("already in use")));
     }
 
     // DISABLED — DO NOT DELETE. This test sends a malformed payload (missing
