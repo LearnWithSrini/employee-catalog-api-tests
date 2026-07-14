@@ -180,6 +180,29 @@ class CreateEmployeeTests extends BaseTest {
         extractEmployeeId(response).ifPresent(createdIds::add);
     }
 
+    @Test
+    @DisplayName("empty-string firstName is rejected with 400 and a min-length message")
+    void emptyFirstName_isRejectedWith400() {
+        // Empty firstName with an otherwise valid body (blank optional contact fields).
+        // This is a case the API handles correctly: a clean 400 with a clear message.
+        Employee employee = Employee.builder()
+                .firstName("")
+                .lastName("Person")
+                .dateOfBirth("1990-01-01")
+                .contactInfo(new ContactInfo(
+                        TestDataFactory.uniqueEmail("empty", "first"), "", new Address("", "", "")))
+                .build();
+
+        Response response = api.createEmployee(token, employee);
+
+        assertThat("an empty first name must be rejected", response.statusCode(), is(400));
+        assertThat("body should explain the minimum-length rule",
+                response.jsonPath().getString("message"),
+                equalTo("First name must be at least 2 characters long."));
+
+        extractEmployeeId(response).ifPresent(createdIds::add);
+    }
+
     // DISABLED — DO NOT DELETE. An empty body {} has no contactInfo object at all,
     // which triggers the crash-on-absent-nested-field defect (502, FINDINGS #5/#8)
     // and takes the shared host + /api-docs UI down. Unlike the missing-single-field
