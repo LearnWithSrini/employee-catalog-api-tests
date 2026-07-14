@@ -1,6 +1,5 @@
 package com.dwp.employeecatalog.tests;
 
-import com.dwp.employeecatalog.model.ContactInfo;
 import com.dwp.employeecatalog.model.Employee;
 import com.dwp.employeecatalog.util.TestDataFactory;
 import io.restassured.response.Response;
@@ -37,8 +36,8 @@ class UpdateEmployeeTests extends BaseTest {
                     .firstName("Amended")
                     .lastName("Surname")
                     .dateOfBirth("1990-01-01")
-                    .contactInfo(new ContactInfo(
-                            TestDataFactory.uniqueEmail("amended", "surname"), null, null))
+                    .contactInfo(TestDataFactory.blankContactInfo(
+                            TestDataFactory.uniqueEmail("amended", "surname")))
                     .build();
 
             Response response = api.updateEmployee(token, id, update);
@@ -65,8 +64,8 @@ class UpdateEmployeeTests extends BaseTest {
                 .firstName("Ghost")
                 .lastName("Missing")
                 .dateOfBirth("1990-01-01")
-                .contactInfo(new ContactInfo(
-                        TestDataFactory.uniqueEmail("ghost", "missing"), null, null))
+                .contactInfo(TestDataFactory.blankContactInfo(
+                        TestDataFactory.uniqueEmail("ghost", "missing")))
                 .build();
 
         Response response = api.updateEmployee(token, TestDataFactory.nonExistentEmployeeId(), update);

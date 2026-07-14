@@ -144,7 +144,8 @@ class LoginTests extends BaseTest {
         Response response = api.login(ConfigManager.adminUsername(),
                 ConfigManager.adminPassword().toUpperCase());
 
-        assertThat("password check should be case-sensitive", response.statusCode(), is(401));
+        // Case-sensitive: an upper-cased password is just a wrong password.
+        assertRejectedWith401(response);
     }
 
     // ---------------------------------------------------------------------

@@ -32,6 +32,8 @@ class DeleteEmployeeTests extends BaseTest {
         Response afterDelete = api.getEmployeeById(token, id);
         assertThat("a deleted employee must not be retrievable",
                 afterDelete.statusCode(), is(404));
+        assertThat("404 body should carry the 'Employee not found' message",
+                afterDelete.jsonPath().getString("message"), equalTo("Employee not found"));
     }
 
     @Test

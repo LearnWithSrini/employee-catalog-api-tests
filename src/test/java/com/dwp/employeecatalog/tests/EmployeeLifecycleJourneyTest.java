@@ -117,5 +117,7 @@ class EmployeeLifecycleJourneyTest extends BaseTest {
         Response response = api.getEmployeeById(token, employeeId);
         assertThat("a departed employee must not be retrievable",
                 response.statusCode(), is(404));
+        assertThat("404 body should carry the 'Employee not found' message",
+                response.jsonPath().getString("message"), equalTo("Employee not found"));
     }
 }
