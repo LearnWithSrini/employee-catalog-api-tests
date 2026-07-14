@@ -46,7 +46,16 @@ public final class TestDataFactory {
                 .build();
     }
 
-    /** A minimal but valid employee: only the API-required fields are present. */
+    /**
+     * A minimal employee the live host accepts: required fields set to real
+     * values, plus a unique email, with the <b>optional</b> contact fields
+     * (phone / address) present but <b>blank ("")</b>.
+     *
+     * <p>Empty strings are used deliberately rather than omitting phone/address:
+     * the API crashes when those nested keys are absent (FINDINGS #8), but accepts
+     * them when present-but-empty. firstName/lastName cannot be blank — the API
+     * rejects an empty name with 400 (FINDINGS #9) — so they carry real values.</p>
+     */
     public static Employee minimalValidEmployee() {
         String firstName = FAKER.name().firstName();
         String lastName = FAKER.name().lastName();
@@ -54,7 +63,10 @@ public final class TestDataFactory {
                 .firstName(firstName)
                 .lastName(lastName)
                 .dateOfBirth("1990-01-01")
-                .contactInfo(new ContactInfo(uniqueEmail(firstName, lastName), null, null))
+                .contactInfo(new ContactInfo(
+                        uniqueEmail(firstName, lastName),
+                        "",                        // blank phone
+                        new Address("", "", "")))  // blank street/town/postCode
                 .build();
     }
 

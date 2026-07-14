@@ -83,16 +83,13 @@ class CreateEmployeeTests extends BaseTest {
         assertThat(response.jsonPath().getString("lastName"), equalTo(employee.getLastName()));
     }
 
-    // DISABLED — DO NOT DELETE. Sends only the documented-required fields, omitting
-    // phone/address. In practice the fragile free-tier host does not tolerate the
-    // absent nested contactInfo fields: it returns 5xx / crashes (same class as
-    // FINDINGS #5, and see FINDINGS #8 — the server appears to require the full
-    // contactInfo despite the docs saying only email is required). Kept for when
-    // the API is fixed / run locally; disabled now so it can't take the host down.
-    @Disabled("Minimal body (no phone/address) crashes/rejects on the live host. See FINDINGS #5/#8.")
     @Test
-    @DisplayName("minimal payload (required fields only) is accepted")
+    @DisplayName("minimal payload (required fields + blank optional contact fields) is accepted (201)")
     void minimalPayload_isAccepted() {
+        // Real first/last name + unique email, with the optional phone/address
+        // sent as blank strings "". The host crashes if those nested keys are
+        // OMITTED (FINDINGS #8) but accepts them present-but-empty, so this is
+        // the smallest body the live service will actually create.
         Employee employee = TestDataFactory.minimalValidEmployee();
 
         Response response = api.createEmployee(token, employee);
