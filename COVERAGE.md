@@ -5,7 +5,13 @@ those declared in the API's OpenAPI spec (plus `403`, observed for an invalid
 token). Test names are the JUnit methods; the class is shown in the last column.
 
 Legend: ✅ asserted · ⚠️ exercised but not asserted exclusively · ❌ not covered
-(see notes) · n/a not applicable for this endpoint.
+(see notes) · ⏸️ disabled · n/a not applicable for this endpoint.
+
+This matrix maps tests that assert an HTTP **status**. A few methods assert a
+non-status precondition and so don't appear here — notably
+`EmployeeLifecycleJourneyTest.step1_adminIsAuthenticated`, which checks a bearer
+token exists before the journey begins. Every other `@Test` in the suite maps to
+at least one row below.
 
 ---
 
@@ -23,9 +29,11 @@ Legend: ✅ asserted · ⚠️ exercised but not asserted exclusively · ❌ not
 |--------|:---:|---------|-------|
 | 201 | ✅ | `validPayload_creates201`, `duplicateFirstName_isAllowed`, `minimalPayload_isAccepted` | `CreateEmployeeTests` |
 | 201 | ✅ | `create_withValidToken_isAuthorized` | `AuthorizationTests` |
+| 201 | ✅ | `step2_addEmployee` | `EmployeeLifecycleJourneyTest` |
 | 400 | ✅ | `duplicateEmail_isRejected`, `emptyFirstName_isRejectedWith400` | `CreateEmployeeTests` |
 | 401 | ✅ | `create_withoutToken_isUnauthorized` | `AuthorizationTests` |
 | 500 | ⚠️ | `missingRequiredField_isRejected`, `missingEmail_isRejected` — assert `oneOf(400,500)`; live host returns 500 (should be 400, FINDINGS #13) | `CreateEmployeeTests` |
+| — | ⏸️ | `emptyBody_isRejected` — `@Disabled`; empty `{}` body crashes the host (502, FINDINGS #5/#8), asserts only *not-201* | `CreateEmployeeTests` |
 
 ## GET /employees
 
@@ -33,6 +41,7 @@ Legend: ✅ asserted · ⚠️ exercised but not asserted exclusively · ❌ not
 |--------|:---:|---------|-------|
 | 200 | ✅ | `returnsOkAndArray`, `everyEmployeeHasId`, `newlyCreatedEmployeeIsListed` | `GetAllEmployeesTests` |
 | 200 | ✅ | `getAll_withValidToken_isAuthorized` | `AuthorizationTests` |
+| 200 | ✅ | `step4_employeeAppearsInCatalog` | `EmployeeLifecycleJourneyTest` |
 | 401 | ✅ | `getAll_withoutToken_isUnauthorized` | `AuthorizationTests` |
 | 403 | ✅ | `garbageToken_isRejected` (invalid token) | `AuthorizationTests` |
 | 500 | ❌ | not deterministically reproducible — see notes | — |
