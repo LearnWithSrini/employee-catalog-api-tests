@@ -27,6 +27,8 @@ class DeleteEmployeeTests extends BaseTest {
 
         Response delete = api.deleteEmployee(token, id);
         assertThat(delete.statusCode(), is(200));
+        assertThat("delete should confirm success in the body",
+                delete.jsonPath().getString("message"), equalTo("Employee deleted successfully!"));
 
         // The employee should no longer be retrievable.
         Response afterDelete = api.getEmployeeById(token, id);
