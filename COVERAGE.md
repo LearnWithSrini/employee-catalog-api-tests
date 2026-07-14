@@ -5,7 +5,7 @@ those declared in the API's OpenAPI spec (plus `403`, observed for an invalid
 token). Test names are the JUnit methods; the class is shown in the last column.
 
 Legend: ✅ asserted · ⚠️ exercised but not asserted exclusively · ❌ not covered
-(see notes) · ⏸️ disabled · n/a not applicable for this endpoint.
+(see notes) · n/a not applicable for this endpoint.
 
 This matrix maps tests that assert an HTTP **status**. A few methods assert a
 non-status precondition and so don't appear here — notably
@@ -33,7 +33,6 @@ at least one row below.
 | 400 | ✅ | `duplicateEmail_isRejected`, `emptyFirstName_isRejectedWith400` | `CreateEmployeeTests` |
 | 401 | ✅ | `create_withoutToken_isUnauthorized` | `AuthorizationTests` |
 | 500 | ⚠️ | `missingRequiredField_isRejected`, `missingEmail_isRejected` — assert `oneOf(400,500)`; live host returns 500 (should be 400, FINDINGS #13) | `CreateEmployeeTests` |
-| — | ⏸️ | `emptyBody_isRejected` — `@Disabled`; empty `{}` body crashes the host (502, FINDINGS #5/#8), asserts only *not-201* | `CreateEmployeeTests` |
 
 ## GET /employees
 

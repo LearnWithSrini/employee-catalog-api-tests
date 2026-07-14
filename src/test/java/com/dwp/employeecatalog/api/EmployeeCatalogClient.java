@@ -98,20 +98,6 @@ public class EmployeeCatalogClient {
         }
     }
 
-    /**
-     * Executes a call exactly once, with no transient-retry. Used by the
-     * malformed-input negative tests: there, a 5xx is a meaningful result to
-     * assert on, not a blip to retry away. Critically, the service has a defect
-     * (see FINDINGS #5) where an invalid payload throws an unhandled error and
-     * can crash the single free-tier instance; retrying the same bad payload
-     * only re-triggers the crash the moment the host restarts, turning one crash
-     * into a sustained outage. Sending it once keeps the blast radius to a
-     * single request so the host can recover.
-     */
-    private Response executeOnce(Supplier<Response> call) {
-        return call.get();
-    }
-
     // ----------------------------------------------------------------------
     // Authentication
     // ----------------------------------------------------------------------
@@ -180,15 +166,6 @@ public class EmployeeCatalogClient {
 
     public Response createEmployeeNoAuth(Object body) {
         return execute(() -> request().body(body).post(Endpoints.EMPLOYEES));
-    }
-
-    /**
-     * Single-shot create with no transient-retry, for negative tests that send
-     * deliberately invalid payloads. See {@link #executeOnce(Supplier)} for why
-     * we must not retry these against the fragile free-tier host.
-     */
-    public Response createEmployeeNoRetry(String token, Object body) {
-        return executeOnce(() -> authedRequest(token).body(body).post(Endpoints.EMPLOYEES));
     }
 
     public Response getEmployeeById(String token, String id) {

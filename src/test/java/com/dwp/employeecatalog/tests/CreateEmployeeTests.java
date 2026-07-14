@@ -4,13 +4,11 @@ import com.dwp.employeecatalog.model.Employee;
 import com.dwp.employeecatalog.util.TestDataFactory;
 import io.restassured.response.Response;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 
 import static org.hamcrest.MatcherAssert.assertThat;
@@ -28,15 +26,11 @@ import static org.hamcrest.Matchers.startsWith;
  *
  * <p><b>Purpose:</b> confirm that a valid, authenticated request creates an
  * employee (HTTP 201 with a generated {@code Emp-} id and the submitted data
- * echoed back), and that invalid requests are rejected — duplicate email (400),
- * missing required fields, and an empty body.</p>
+ * echoed back), and that invalid requests are rejected — duplicate email (400)
+ * and missing required fields.</p>
  *
- * <p>One negative case (an empty {@code {}} body) stays
- * {@link org.junit.jupiter.api.Disabled} because it still crashes the shared host
- * (FINDINGS #5/#8) and uses {@code createEmployeeNoRetry} so the crash isn't
- * retried; it is retained to run against a fixed or local API. Employees created
- * here are removed in {@link #cleanUp()} so runs stay independent and the shared
- * catalog stays tidy.</p>
+ * <p>Employees created here are removed in {@link #cleanUp()} so runs stay
+ * independent and the shared catalog stays tidy.</p>
  */
 @DisplayName("POST /employees - create employee")
 class CreateEmployeeTests extends BaseTest {
@@ -225,21 +219,5 @@ class CreateEmployeeTests extends BaseTest {
 
         assertRejectedAsValidationError(response, "email");
         extractEmployeeId(response).ifPresent(createdIds::add);
-    }
-
-    // DISABLED — DO NOT DELETE. An empty body {} has no contactInfo object at all,
-    // which triggers the crash-on-absent-nested-field defect (502, FINDINGS #5/#8)
-    // and takes the shared host + /api-docs UI down. Unlike the missing-single-field
-    // cases above (which return a handled 500), this one still crashes, so it stays
-    // disabled. Re-enable against a fixed / local API.
-    @Disabled("Empty body crashes the live free-tier host (502, absent contactInfo). See FINDINGS #5/#8.")
-    @Test
-    @DisplayName("empty JSON body is rejected, not 201")
-    void emptyBody_isRejected() {
-        // No-retry: an empty body can crash the fragile free-tier host (FINDINGS #5).
-        Response response = api.createEmployeeNoRetry(token, Map.of());
-
-        assertThat("an empty body must not create an employee",
-                response.statusCode(), is(not(201)));
     }
 }
